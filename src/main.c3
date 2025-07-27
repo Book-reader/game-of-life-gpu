@@ -24,8 +24,11 @@ enum Cell : const bool
 // const HEIGHT = 600;
 // const WIDTH = 20;
 // const HEIGHT = 20;
+// const WIDTH = 1280; //1920;
+// const HEIGHT = 720; //1080;
 const WIDTH = 1920;
 const HEIGHT = 1080;
+const float SCALE = 1920.0 / WIDTH;
 typedef World = Cell[WIDTH][HEIGHT];
 
 macro mod(dividend, divisor)
@@ -38,8 +41,9 @@ macro mod(dividend, divisor)
 	}
 }
 
-World world;
-World prev;
+World[2] bufs;
+World* world = &bufs[0];
+World* prev = &bufs[1];
 fn char World.count_neighbours(&self, usz cell_x, usz cell_y)
 {
 	char count;
@@ -66,23 +70,23 @@ fn char World.count_neighbours(&self, usz cell_x, usz cell_y)
 fn int main(String[] args)
 {
 	foreach (&row : world) foreach (&cell : row) *cell = rnd() > 0.5 ? ALIVE : DEAD;
-	world[0][1] = ALIVE;
-	world[1][2] = ALIVE;
-	world[2][0..2] = ALIVE;
+	(*world)[0][1] = ALIVE;
+	(*world)[1][2] = ALIVE;
+	(*world)[2][0..2] = ALIVE;
 	//world[]
 	// io::printn("Hello, World!");
-	rl::initWindow(WIDTH, HEIGHT, "Game of Life");
+	rl::initWindow((int)(WIDTH * SCALE), (int)(HEIGHT * SCALE), "Game of Life");
 	defer rl::closeWindow();
 
 	Image world_img = {
-		.data = &world,
+		.data = world,
 		.width = WIDTH,
 		.height = HEIGHT,
 		.format = UNCOMPRESSED_GRAYSCALE,
 		.mipmaps = 1,
 	};
 	Texture2D world_tex = rl::loadTextureFromImage(world_img);
-	// rl::setTargetFPS(60);
+	rl::setTargetFPS(60);
 
 	Shader boolean_transparency = rl::loadShaderFromMemory(vs: null, fs: SHADER);
 	defer rl::unloadShader(boolean_transparency);
@@ -92,12 +96,14 @@ fn int main(String[] args)
 	while (!rl::windowShouldClose()) rl::@drawing()
 	{
 		rl::setShaderValue(boolean_transparency, mag_loc, &magnification, FLOAT);
-		prev = world;
+		// current = current == &world ? &back : &world;
+		// world = prev;
+		@swap(world, prev);
 		rl::clearBackground(rl::WHITE);
-		rl::updateTexture(world_tex, &world);
+		rl::updateTexture(world_tex, world);
 
 		rl::beginShaderMode(boolean_transparency);
-			rl::drawTexture(world_tex, 0, 0, rl::WHITE);
+			rl::drawTextureEx(world_tex, {0, 0}, 0.0, SCALE, rl::WHITE);
 		rl::endShaderMode();
 
 		usz alive;
@@ -105,27 +111,26 @@ fn int main(String[] args)
 		{
 			char n = prev.count_neighbours(x, y);
 			// if (n != 0 && (n > 3 || n < 2)) io::printn(n);
-			if (prev[y][x] == ALIVE)
+			if ((*prev)[y][x] == ALIVE)
 			{
 				alive ++;
-				// world[x][y] = n == 3 || n == 2 ? ALIVE : DEAD;
-				switch (n)
+				(*world)[y][x] = n == 3 || n == 2 ? ALIVE : DEAD;
+/*				switch (n)
 				{
 					case 0..1:
 					case 4..8:
 						// io::printfn("killing cell at %s:%s", x, y);
-						world[y][x] = DEAD;
+						(*world)[y][x] = DEAD;
 					case 2..3:
-						// world[x][y] = ALIVE;
+						(*world)[y][x] = ALIVE;
 						break;
 					default:
 						unreachable("cannot have more than 8 neighbours");
-				}
+				}*/
 			}
-			else if (n == 3)
+			else
 			{
-				// io::printfn("reviving dead cell at %s:%s", x, y);
-				world[y][x] = ALIVE;
+				(*world)[y][x] = (n == 3) ? ALIVE : DEAD;
 			}
 		}
 		magnification += 0.01;
@@ -140,7 +145,7 @@ fn int main(String[] args)
 	return 0;
 }
 
-const SHADER =
+const SHADER = @sprintf(
 `
 #version 330
 in vec2 fragTexCoord;
@@ -152,9 +157,10 @@ uniform vec4 colDiffuse;
 out vec4 finalColor;
 
 uniform float magnification = 1.0;
+
 vec4 getCoords()
 {
-	return texture(texture0, fragTexCoord / magnification);
+	return texture(texture0, fragTexCoord / %s / magnification);
 }
 
 void main()
@@ -163,4 +169,4 @@ void main()
 
 	finalColor = texelColor == vec4(0.0, 0.0, 0.0, 1.0) ? vec4(0.0, 0.0, 0.0, 1.0) : vec4(1.0, 1.0, 1.0, 1.0);
 }
-`;
+`, SCALE);

@@ -8,17 +8,17 @@ import raylib5::rl;
 // typedef Neighbours = Cell[<8>];
 
 
-enum Cell : const char
+/*enum Cell : const char
 {
 	DEAD = 0,
 	ALIVE = 255,
-}
+}*/
 
-/*enum Cell : const bool
+enum Cell : const bool
 {
 	DEAD = false,
 	ALIVE = true,
-}*/
+}
 
 // const WIDTH = 800;
 // const HEIGHT = 600;
@@ -43,7 +43,7 @@ World prev;
 fn char World.count_neighbours(&self, usz cell_x, usz cell_y)
 {
 	char count;
-	for (isz x = cell_x - 1; x < cell_x + 2; x ++)
+	/*for (isz x = cell_x - 1; x < cell_x + 2; x ++)
 	{
 		for (isz y = cell_y - 1; y < cell_y + 2; y ++)
 		{
@@ -52,6 +52,13 @@ fn char World.count_neighbours(&self, usz cell_x, usz cell_y)
 			if (x != cell_x || y != cell_y) count += (char)((*self)[mod(y, HEIGHT)][mod(x, WIDTH)] == ALIVE);
 		}
 		// io::printn();
+	}*/
+	for (int x_off = -1; x_off < 2; x_off ++)
+	{
+		for (int y_off = -1; y_off < 2; y_off ++)
+		{
+			if (x_off != 0 || y_off != 0) count += (char)((*self)[mod(cell_y + y_off, HEIGHT)][mod(cell_x + x_off, WIDTH)] == ALIVE);
+		}
 	}
 	return count;
 }
@@ -77,12 +84,21 @@ fn int main(String[] args)
 	Texture2D world_tex = rl::loadTextureFromImage(world_img);
 	// rl::setTargetFPS(60);
 
+	Shader boolean_transparency = rl::loadShaderFromMemory(vs: null, fs: SHADER);
+	defer rl::unloadShader(boolean_transparency);
+
+	float magnification = 1.0;
+	int mag_loc = rl::getShaderLocation(boolean_transparency, "magnification");
 	while (!rl::windowShouldClose()) rl::@drawing()
 	{
+		rl::setShaderValue(boolean_transparency, mag_loc, &magnification, FLOAT);
 		prev = world;
 		rl::clearBackground(rl::WHITE);
 		rl::updateTexture(world_tex, &world);
-		rl::drawTexture(world_tex, 0, 0, rl::WHITE);
+
+		rl::beginShaderMode(boolean_transparency);
+			rl::drawTexture(world_tex, 0, 0, rl::WHITE);
+		rl::endShaderMode();
 
 		usz alive;
 		for (usz x = 0; x < WIDTH; x++) for (usz y = 0; y < HEIGHT; y++)
@@ -112,7 +128,7 @@ fn int main(String[] args)
 				world[y][x] = ALIVE;
 			}
 		}
-		
+		magnification += 0.01;
 		// static usz frames;
 		// io::printfn("end of frame %s", ++frames);
 		rl::drawFPS(20, 20);
@@ -123,3 +139,28 @@ fn int main(String[] args)
 	
 	return 0;
 }
+
+const SHADER =
+`
+#version 330
+in vec2 fragTexCoord;
+in vec4 fragColor;
+
+uniform sampler2D texture0;
+uniform vec4 colDiffuse;
+
+out vec4 finalColor;
+
+uniform float magnification = 1.0;
+vec4 getCoords()
+{
+	return texture(texture0, fragTexCoord / magnification);
+}
+
+void main()
+{
+	vec4 texelColor = getCoords()*colDiffuse*fragColor;
+
+	finalColor = texelColor == vec4(0.0, 0.0, 0.0, 1.0) ? vec4(0.0, 0.0, 0.0, 1.0) : vec4(1.0, 1.0, 1.0, 1.0);
+}
+`;

@@ -14,11 +14,19 @@ enum Cell : const char
 	ALIVE = 255,
 }
 
-const WIDTH = 800;
-const HEIGHT = 600;
+/*enum Cell : const bool
+{
+	DEAD = false,
+	ALIVE = true,
+}*/
+
+// const WIDTH = 800;
+// const HEIGHT = 600;
 // const WIDTH = 20;
 // const HEIGHT = 20;
-typedef World = Cell[HEIGHT][WIDTH];
+const WIDTH = 1920;
+const HEIGHT = 1080;
+typedef World = Cell[WIDTH][HEIGHT];
 
 macro mod(dividend, divisor)
 {
@@ -41,7 +49,7 @@ fn char World.count_neighbours(&self, usz cell_x, usz cell_y)
 		{
 			// io::print((*self)[mod(x, WIDTH)][mod(y, HEIGHT)] == ALIVE ? "1" : "0");
 			// io::printfn("x: %s, y: %s, mod(x): %s, mod(y): %s", x, y, mod(x, WIDTH), mod(y, HEIGHT));
-			if (x != cell_x || y != cell_y) count += (char)((*self)[mod(x, WIDTH)][mod(y, HEIGHT)] == ALIVE);
+			if (x != cell_x || y != cell_y) count += (char)((*self)[mod(y, HEIGHT)][mod(x, WIDTH)] == ALIVE);
 		}
 		// io::printn();
 	}
@@ -77,11 +85,11 @@ fn int main(String[] args)
 		rl::drawTexture(world_tex, 0, 0, rl::WHITE);
 
 		usz alive;
-		for (int x = 0; x < WIDTH; x++) for (int y = 0; y < HEIGHT; y++)
+		for (usz x = 0; x < WIDTH; x++) for (usz y = 0; y < HEIGHT; y++)
 		{
 			char n = prev.count_neighbours(x, y);
 			// if (n != 0 && (n > 3 || n < 2)) io::printn(n);
-			if (prev[x][y] == ALIVE)
+			if (prev[y][x] == ALIVE)
 			{
 				alive ++;
 				// world[x][y] = n == 3 || n == 2 ? ALIVE : DEAD;
@@ -90,7 +98,7 @@ fn int main(String[] args)
 					case 0..1:
 					case 4..8:
 						// io::printfn("killing cell at %s:%s", x, y);
-						world[x][y] = DEAD;
+						world[y][x] = DEAD;
 					case 2..3:
 						// world[x][y] = ALIVE;
 						break;
@@ -101,7 +109,7 @@ fn int main(String[] args)
 			else if (n == 3)
 			{
 				// io::printfn("reviving dead cell at %s:%s", x, y);
-				world[x][y] = ALIVE;
+				world[y][x] = ALIVE;
 			}
 		}
 		
@@ -109,6 +117,7 @@ fn int main(String[] args)
 		// io::printfn("end of frame %s", ++frames);
 		rl::drawFPS(20, 20);
 		@pool() { rl::drawText(string::tformat_zstr("Alive cells: %s", alive), 20, 50, 32, rl::GREEN); };
+		rl::drawText(@sprintf("Grid size: %sx%s", WIDTH, HEIGHT), 20, 80, 20, rl::GREEN);
 	};
 
 	

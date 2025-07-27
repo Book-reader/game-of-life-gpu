@@ -77,11 +77,11 @@ fn int main(String[] args)
 		rl::drawTexture(world_tex, 0, 0, rl::WHITE);
 
 		usz alive;
-		foreach (int x, &col : prev) foreach (int y, cell : col)
+		for (int x = 0; x < WIDTH; x++) for (int y = 0; y < HEIGHT; y++)
 		{
 			char n = prev.count_neighbours(x, y);
 			// if (n != 0 && (n > 3 || n < 2)) io::printn(n);
-			if (cell == ALIVE)
+			if (prev[x][y] == ALIVE)
 			{
 				alive ++;
 				// world[x][y] = n == 3 || n == 2 ? ALIVE : DEAD;

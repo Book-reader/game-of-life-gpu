@@ -28,7 +28,7 @@ enum Cell : const char
 // const HEIGHT = 720; //1080;
 const SCREEN_WIDTH = 1920;
 const SCREEN_HEIGHT = 1080;
-const float SCALE = 1.0;
+const float SCALE = 0.5;
 const WIDTH = (usz)(SCREEN_WIDTH / SCALE);
 const HEIGHT = (usz)(SCREEN_HEIGHT / SCALE);
 
@@ -54,6 +54,8 @@ fn int main(String[] args)
 	(*world)[0][1] = ALIVE;
 	(*world)[1][2] = ALIVE;
 	(*world)[2][0..2] = ALIVE;
+	// (*world)[^1][^2..^1] = ALIVE;
+	// (*world)[^2][^2..^1] = ALIVE;
 	//world[]
 	// io::printn("Hello, World!");
 	rl::initWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Game of Life");
@@ -80,7 +82,7 @@ fn int main(String[] args)
 		rl::drawTexture(world_tex, 0, 0, rl::WHITE);
 	};
 
-	// rl::setTargetFPS(10);
+	rl::setTargetFPS(60);
 
 	Shader render_shader = rl::loadShaderFromMemory(vs: null, fs: RENDER_SHADER);
 	defer rl::unloadShader(render_shader);
@@ -89,8 +91,9 @@ fn int main(String[] args)
 	defer rl::unloadShader(scaling_shader);
 
 	float magnification = 1.0;
+	float[<2>] camera_pos = {0, 0};
 	int mag_loc = rl::getShaderLocation(scaling_shader, "magnification");
-	// int nbor_loc = rl::getShaderLocation(render_shader, "neighbours");
+	int cpos_loc = rl::getShaderLocation(scaling_shader, "camera_pos");
 	while (!rl::windowShouldClose()) rl::@drawing()
 	{
 		// @swap(world, prev);
@@ -116,22 +119,42 @@ fn int main(String[] args)
 		};
 
 		rl::setShaderValue(scaling_shader, mag_loc, &magnification, FLOAT);
+		rl::setShaderValue(scaling_shader, cpos_loc, &camera_pos, VEC2);
 		rl::@shaderMode(scaling_shader)
 		{
 			// rl::drawTexturePro(front_tex.texture, {0, 0, WIDTH, -HEIGHT}, {500, 500, WIDTH, HEIGHT}, {0, 0}, 0.0, rl::WHITE);
 			rl::drawTextureEx(front_tex.texture, {0, 0}, 0.0, SCALE, rl::WHITE);
 		};
 
-		const STEP = 0.95;
-		if (rl::isKeyDown(rl::KEY_PAGE_UP) && magnification < 10)
+		const ZOOM_STEP = 0.95;
+		const MOVE_STEP = 0.05;
+		if (rl::isKeyDown(rl::KEY_PAGE_UP))
 		{
-			magnification /= STEP;
+			magnification /= ZOOM_STEP;
 		}
-		if (rl::isKeyDown(rl::KEY_PAGE_DOWN) && magnification > 1)
+		if (rl::isKeyDown(rl::KEY_PAGE_DOWN))
 		{
-			magnification *= STEP;
+			magnification *= ZOOM_STEP;
 		}
-		// if (rl::isKeyDown)
+
+		if (rl::isKeyDown(rl::KEY_UP))
+		{
+			camera_pos.y -= MOVE_STEP / magnification;
+		}
+		if (rl::isKeyDown(rl::KEY_DOWN))
+		{
+			camera_pos.y += MOVE_STEP / magnification;
+		}
+		if (rl::isKeyDown(rl::KEY_LEFT))
+		{
+			camera_pos.x -= MOVE_STEP / magnification;
+		}
+		if (rl::isKeyDown(rl::KEY_RIGHT))
+		{
+			camera_pos.x += MOVE_STEP / magnification;
+		}
+		magnification = magnification.clamp(1, 50 / SCALE);
+		camera_pos = camera_pos.clamp({0, 0}, {1 - 1 / magnification, 1 - 1 / magnification});
 
 
 		rl::drawRectangle(0, 0, 350, 120, rl::RAYWHITE);
@@ -143,8 +166,12 @@ fn int main(String[] args)
 			if (val.r == 255) alive ++;
 		}
 		rl::drawFPS(20, 20);
-		@pool() { rl::drawText(string::tformat_zstr("Alive cells: %s", alive), 20, 50, 32, rl::GREEN); };
-		rl::drawText(@sprintf("Grid size: %sx%s", WIDTH, HEIGHT), 20, 80, 20, rl::GREEN);
+		@pool()
+		{
+			rl::drawText(string::tformat_zstr("Alive cells: %s", alive), 20, 50, 32, rl::GREEN);
+			rl::drawText(string::tformat_zstr("camera pos: %s. magnification: %s", camera_pos, magnification), 20, 80, 15, rl::GREEN);
+		};
+		rl::drawText(@sprintf("Grid size: %sx%s", WIDTH, HEIGHT), 20, 100, 20, rl::GREEN);
 	};
 
 	
@@ -217,11 +244,12 @@ uniform vec4 colDiffuse;
 out vec4 finalColor;
 
 uniform float magnification = 1.0;
+uniform vec2 camera_pos = vec2(0.0, 0.0);
 
 vec4 getCoords()
 {
 	// this inverts the Y coordinate to unflip the image to the correct orientation
-	return texture(texture0, vec2(fragTexCoord.x, -fragTexCoord.y) / magnification);
+	return texture(texture0, (vec2(fragTexCoord.x, -fragTexCoord.y) / magnification) + vec2(camera_pos.x, -camera_pos.y));
 }
 
 void main()

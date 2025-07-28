@@ -105,73 +105,65 @@ fn int main(String[] args)
 	};
 	Texture2D world_tex = rl::loadTextureFromImage(world_img);
 	defer rl::unloadTexture(world_tex);
-	RenderTexture2D res_tex = rl::loadRenderTexture(WIDTH, HEIGHT);
-	defer rl::unloadRenderTexture(res_tex);
+
+	RenderTexture2D front_tex = rl::loadRenderTexture(WIDTH, HEIGHT);
+	defer rl::unloadRenderTexture(front_tex);
+
+	RenderTexture2D back_tex = rl::loadRenderTexture(WIDTH, HEIGHT);
+	defer rl::unloadRenderTexture(back_tex);
+
+	rl::@textureMode(front_tex)
+	{
+		rl::drawTexture(world_tex, 0, 0, rl::WHITE);
+	};
+
 	// rl::setTargetFPS(10);
 
-	Shader boolean_transparency = rl::loadShaderFromMemory(vs: null, fs: SHADER);
-	defer rl::unloadShader(boolean_transparency);
+	Shader render_shader = rl::loadShaderFromMemory(vs: null, fs: RENDER_SHADER);
+	defer rl::unloadShader(render_shader);
+
+	Shader scaling_shader = rl::loadShaderFromMemory(vs: null, fs: SCALING_SHADER);
+	defer rl::unloadShader(scaling_shader);
 
 	float magnification = 1.0;
-	int mag_loc = rl::getShaderLocation(boolean_transparency, "magnification");
-	int nbor_loc = rl::getShaderLocation(boolean_transparency, "neighbours");
+	int mag_loc = rl::getShaderLocation(scaling_shader, "magnification");
+	// int nbor_loc = rl::getShaderLocation(render_shader, "neighbours");
 	while (!rl::windowShouldClose()) rl::@drawing()
 	{
-		// rl::setShaderValue(boolean_transparency, mag_loc, &magnification, FLOAT);
-
 		// @swap(world, prev);
 		// rl::clearBackground(rl::WHITE);
 		// rl::updateTexture(world_tex, world);
 
-		rl::@textureMode(res_tex)
+		rl::@textureMode(back_tex)
 		{
 			rl::clearBackground(rl::WHITE);
-		// TODO: the scaling has to be done seperately
-			rl::@shaderMode(boolean_transparency)
+			// TODO: the scaling has to be done seperately
+			rl::@shaderMode(render_shader)
 			{
-				// rl::drawTextureRec(world_tex, {0, 0, WIDTH, -HEIGHT}, {0, 0}, rl::WHITE);
-				rl::drawTexture(world_tex, 0, 0, rl::WHITE);
+				rl::drawTextureRec(front_tex.texture, {0, 0, WIDTH, HEIGHT}, {0, 0}, rl::WHITE);
+				// rl::drawTexture(front_tex.texture, 0, 0, rl::WHITE);
 			};
 		};
 		// rl::drawTextureEx(res_tex.texture, {0, 0}, 0.0, SCALE, rl::WHITE);
-		rl::drawTexturePro(res_tex.texture, {0, 0, WIDTH, HEIGHT}, {0, 0, SCREEN_WIDTH, SCREEN_HEIGHT}, {0, 0}, 0.0, rl::WHITE);
+		// rl::drawTexturePro(back_tex.texture, {0, 0, WIDTH, HEIGHT}, {0, 0, SCREEN_WIDTH, SCREEN_HEIGHT}, {0, 0}, 0.0, rl::WHITE);
 
-		// rl::unloadImage(world_img);
-		world_img = rl::loadImageFromTexture(res_tex.texture);
-		rl::imageFlipVertical(&world_img);
-		world_tex = rl::loadTextureFromImage(world_img);
-
-		usz alive;
-/*		for (usz x = 0; x < WIDTH; x++) for (usz y = 0; y < HEIGHT; y++)
+		rl::@textureMode(front_tex)
 		{
-			
-			char n = prev.count_neighbours(x, y);
-			// if (n != 0 && (n > 3 || n < 2)) io::printn(n);
-			if ((*prev)[y][x] == ALIVE)
-			{
-				alive ++;
-				(*world)[y][x] = n == 3 || n == 2 ? ALIVE : DEAD;
-/*				switch (n)
-				{
-					case 0..1:
-					case 4..8:
-						// io::printfn("killing cell at %s:%s", x, y);
-						(*world)[y][x] = DEAD;
-					case 2..3:
-						(*world)[y][x] = ALIVE;
-						break;
-					default:
-						unreachable("cannot have more than 8 neighbours");
-				}*/
-			}
-			else
-			{
-				(*world)[y][x] = (n == 3) ? ALIVE : DEAD;
-			}
-		}*/
-		// magnification += 0.01;
-		// static usz frames;
-		// io::printfn("end of frame %s", ++frames);
+			rl::drawTexture(back_tex.texture, 0, 0, rl::WHITE);
+		};
+
+		rl::setShaderValue(scaling_shader, mag_loc, &magnification, FLOAT);
+		rl::@shaderMode(scaling_shader)
+		{
+			rl::drawTextureEx(front_tex.texture, {0, 0}, 0.0, SCALE, rl::WHITE);
+		};
+		magnification += 0.005;
+
+
+		rl::drawRectangle(0, 0, 350, 120, rl::RAYWHITE);
+		usz alive;
+		world_img = rl::loadImageFromTexture(front_tex.texture);
+		defer rl::unloadImage(world_img);
 		foreach (val : ((char[<4>]*)world_img.data)[:world_img.width * world_img.height])
 		{
 			if (val.r == 255) alive ++;
@@ -185,7 +177,7 @@ fn int main(String[] args)
 	return 0;
 }
 
-const SHADER = @sprintf(
+const RENDER_SHADER = @sprintf(
 `
 #version 330
 in vec2 fragTexCoord;
@@ -199,17 +191,14 @@ uniform vec4 colDiffuse;
 
 out vec4 finalColor;
 
-uniform float magnification = 1.0;
-// uniform bool neighbours[8];
-
 vec4 getCoords()
 {
-	return texture(texture0, fragTexCoord / magnification);
+	return texture(texture0, fragTexCoord);
 }
 
 vec4 getPixelAtOffset(float x, float y)
 {
-	return texture(texture0, (fragTexCoord + vec2(x / WIDTH, y / HEIGHT)) / magnification);
+	return texture(texture0, (fragTexCoord + vec2(x / WIDTH, y / HEIGHT)));
 }
 
 #define DEAD vec4(0.0, 0.0, 0.0, 1.0)
@@ -231,12 +220,7 @@ void main()
 	count += int(getPixelAtOffset(1.0, 0.0) == ALIVE);
 	count += int(getPixelAtOffset(1.0, 1.0) == ALIVE);
 
-	// finalColor = texelColor == DEAD ? count == 3 ? ALIVE : DEAD : count == 2 || count == 3 ? ALIVE : DEAD;
-/*	if (fragTexCoord.x < 0.1 && fragTexCoord.y < 0.1)
-	{
-		finalColor = vec4(1.0, 0.0, 0.0, 1.0);
-	}
-	else*/ if (texelColor == DEAD)
+	if (texelColor == DEAD)
 	{
 		finalColor = count == 3 ? ALIVE : DEAD;
 	}
@@ -246,3 +230,28 @@ void main()
 	}
 }
 `, WIDTH, HEIGHT);
+
+const SCALING_SHADER =
+`
+#version 330
+in vec2 fragTexCoord;
+in vec4 fragColor;
+
+uniform sampler2D texture0;
+uniform vec4 colDiffuse;
+
+out vec4 finalColor;
+
+uniform float magnification = 1.0;
+
+vec4 getCoords()
+{
+	return texture(texture0, fragTexCoord / magnification);
+}
+
+void main()
+{
+	vec4 texelColor = getCoords()*colDiffuse*fragColor;
+	finalColor = texelColor;
+}
+`;

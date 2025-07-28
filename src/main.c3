@@ -47,43 +47,6 @@ macro mod(dividend, divisor)
 World[2] bufs;
 World* world = &bufs[0];
 World* prev = &bufs[1];
-fn char World.count_neighbours(&self, usz cell_x, usz cell_y)
-{
-	char count;
-	/*for (isz x = cell_x - 1; x < cell_x + 2; x ++)
-	{
-		for (isz y = cell_y - 1; y < cell_y + 2; y ++)
-		{
-			// io::print((*self)[mod(x, WIDTH)][mod(y, HEIGHT)] == ALIVE ? "1" : "0");
-			// io::printfn("x: %s, y: %s, mod(x): %s, mod(y): %s", x, y, mod(x, WIDTH), mod(y, HEIGHT));
-			if (x != cell_x || y != cell_y) count += (char)((*self)[mod(y, HEIGHT)][mod(x, WIDTH)] == ALIVE);
-		}
-		// io::printn();
-	}*/
-	for (int x_off = -1; x_off < 2; x_off ++)
-	{
-		for (int y_off = -1; y_off < 2; y_off ++)
-		{
-			if (x_off != 0 || y_off != 0) count += (char)((*self)[mod(cell_y + y_off, HEIGHT)][mod(cell_x + x_off, WIDTH)] == ALIVE);
-		}
-	}
-	return count;
-}
-
-fn bool[8] World.get_neighbours(&self, usz cell_x, usz cell_y)
-{
-	bool[8] list;
-	usz idx;
-	for (int x_off = -1; x_off < 2; x_off ++)
-	{
-		for (int y_off = -1; y_off < 2; y_off ++)
-		{
-			if (x_off != 0 || y_off != 0) list[idx++] = (*self)[mod(cell_y + y_off, HEIGHT)][mod(cell_x + x_off, WIDTH)] == ALIVE;
-		}
-	}
-	return list;
-
-}
 
 fn int main(String[] args)
 {
@@ -155,9 +118,20 @@ fn int main(String[] args)
 		rl::setShaderValue(scaling_shader, mag_loc, &magnification, FLOAT);
 		rl::@shaderMode(scaling_shader)
 		{
+			// rl::drawTexturePro(front_tex.texture, {0, 0, WIDTH, -HEIGHT}, {500, 500, WIDTH, HEIGHT}, {0, 0}, 0.0, rl::WHITE);
 			rl::drawTextureEx(front_tex.texture, {0, 0}, 0.0, SCALE, rl::WHITE);
 		};
-		magnification += 0.005;
+
+		const STEP = 0.95;
+		if (rl::isKeyDown(rl::KEY_PAGE_UP) && magnification < 10)
+		{
+			magnification /= STEP;
+		}
+		if (rl::isKeyDown(rl::KEY_PAGE_DOWN) && magnification > 1)
+		{
+			magnification *= STEP;
+		}
+		// if (rl::isKeyDown)
 
 
 		rl::drawRectangle(0, 0, 350, 120, rl::RAYWHITE);
@@ -246,7 +220,8 @@ uniform float magnification = 1.0;
 
 vec4 getCoords()
 {
-	return texture(texture0, fragTexCoord / magnification);
+	// this inverts the Y coordinate to unflip the image to the correct orientation
+	return texture(texture0, vec2(fragTexCoord.x, -fragTexCoord.y) / magnification);
 }
 
 void main()

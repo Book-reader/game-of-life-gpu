@@ -2,6 +2,8 @@ module game_of_life;
 import std::io;
 import std::math::random;
 
+import load;
+
 import raylib5::rl;
 
 enum Cell : const char
@@ -32,10 +34,15 @@ World world;
 
 fn int main(String[] args)
 {
-	foreach (&row : world) foreach (&cell : row) *cell = rnd() > 0.5 ? ALIVE : DEAD;
-	world[0][1] = ALIVE;
-	world[1][2] = ALIVE;
-	world[2][0..2] = ALIVE;
+	if (args.len == 2) @pool()
+	{
+		String file = (String)file::load(tmem, args[1])!!;
+		foreach (y, ln: *(Cell[][]*)&&load::decode(tmem, file))
+		{
+			world[y][:ln.len] = ln[..];
+		}
+	};
+	if (args.len != 2) foreach (&row : world) foreach (&cell : row) *cell = rnd() > 0.5 ? ALIVE : DEAD;
 
 	rl::initWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Game of Life");
 	defer rl::closeWindow();
@@ -127,7 +134,7 @@ fn int main(String[] args)
 		camera_pos = camera_pos.clamp({0, 0}, {1 - 1 / magnification, 1 - 1 / magnification});
 
 
-		rl::drawRectangle(0, 0, 400, 120, rl::RAYWHITE);
+		//rl::drawRectangle(0, 0, 400, 120, rl::RAYWHITE);
 		static usz alive;
 		static usz i;
 		i++;

@@ -4,31 +4,15 @@ import std::math::random;
 
 import raylib5::rl;
 
-// See if I can do something with this:
-// typedef Neighbours = Cell[<8>];
-
-
 enum Cell : const char
 {
 	DEAD = 0,
 	ALIVE = 255,
 }
 
-/*enum Cell : const bool
-{
-	DEAD = false,
-	ALIVE = true,
-}*/
-
-// const WIDTH = 800;
-// const HEIGHT = 600;
-// const WIDTH = 20;
-// const HEIGHT = 20;
-// const WIDTH = 1280; //1920;
-// const HEIGHT = 720; //1080;
 const SCREEN_WIDTH = 1920;
 const SCREEN_HEIGHT = 1080;
-const float SCALE = 0.5;
+const float SCALE = 0.25; // 0.12; // 0.1178;
 const WIDTH = (usz)(SCREEN_WIDTH / SCALE);
 const HEIGHT = (usz)(SCREEN_HEIGHT / SCALE);
 
@@ -44,25 +28,20 @@ macro mod(dividend, divisor)
 	}
 }
 
-World[2] bufs;
-World* world = &bufs[0];
-World* prev = &bufs[1];
+World world;
 
 fn int main(String[] args)
 {
 	foreach (&row : world) foreach (&cell : row) *cell = rnd() > 0.5 ? ALIVE : DEAD;
-	(*world)[0][1] = ALIVE;
-	(*world)[1][2] = ALIVE;
-	(*world)[2][0..2] = ALIVE;
-	// (*world)[^1][^2..^1] = ALIVE;
-	// (*world)[^2][^2..^1] = ALIVE;
-	//world[]
-	// io::printn("Hello, World!");
+	world[0][1] = ALIVE;
+	world[1][2] = ALIVE;
+	world[2][0..2] = ALIVE;
+
 	rl::initWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Game of Life");
 	defer rl::closeWindow();
 
 	Image world_img = {
-		.data = world,
+		.data = &world,
 		.width = WIDTH,
 		.height = HEIGHT,
 		.format = UNCOMPRESSED_GRAYSCALE,
@@ -77,6 +56,7 @@ fn int main(String[] args)
 	RenderTexture2D back_tex = rl::loadRenderTexture(WIDTH, HEIGHT);
 	defer rl::unloadRenderTexture(back_tex);
 
+	// Initial copy of randomised world texture onto the front buffer
 	rl::@textureMode(front_tex)
 	{
 		rl::drawTexture(world_tex, 0, 0, rl::WHITE);
@@ -96,22 +76,13 @@ fn int main(String[] args)
 	int cpos_loc = rl::getShaderLocation(scaling_shader, "camera_pos");
 	while (!rl::windowShouldClose()) rl::@drawing()
 	{
-		// @swap(world, prev);
-		// rl::clearBackground(rl::WHITE);
-		// rl::updateTexture(world_tex, world);
-
 		rl::@textureMode(back_tex)
 		{
-			rl::clearBackground(rl::WHITE);
-			// TODO: the scaling has to be done seperately
 			rl::@shaderMode(render_shader)
 			{
-				rl::drawTextureRec(front_tex.texture, {0, 0, WIDTH, HEIGHT}, {0, 0}, rl::WHITE);
-				// rl::drawTexture(front_tex.texture, 0, 0, rl::WHITE);
+				rl::drawTexture(front_tex.texture, 0, 0, rl::WHITE);
 			};
 		};
-		// rl::drawTextureEx(res_tex.texture, {0, 0}, 0.0, SCALE, rl::WHITE);
-		// rl::drawTexturePro(back_tex.texture, {0, 0, WIDTH, HEIGHT}, {0, 0, SCREEN_WIDTH, SCREEN_HEIGHT}, {0, 0}, 0.0, rl::WHITE);
 
 		rl::@textureMode(front_tex)
 		{
@@ -122,7 +93,6 @@ fn int main(String[] args)
 		rl::setShaderValue(scaling_shader, cpos_loc, &camera_pos, VEC2);
 		rl::@shaderMode(scaling_shader)
 		{
-			// rl::drawTexturePro(front_tex.texture, {0, 0, WIDTH, -HEIGHT}, {500, 500, WIDTH, HEIGHT}, {0, 0}, 0.0, rl::WHITE);
 			rl::drawTextureEx(front_tex.texture, {0, 0}, 0.0, SCALE, rl::WHITE);
 		};
 
@@ -157,18 +127,22 @@ fn int main(String[] args)
 		camera_pos = camera_pos.clamp({0, 0}, {1 - 1 / magnification, 1 - 1 / magnification});
 
 
-		rl::drawRectangle(0, 0, 350, 120, rl::RAYWHITE);
-		usz alive;
-		world_img = rl::loadImageFromTexture(front_tex.texture);
-		defer rl::unloadImage(world_img);
-		foreach (val : ((char[<4>]*)world_img.data)[:world_img.width * world_img.height])
+		rl::drawRectangle(0, 0, 400, 120, rl::RAYWHITE);
+		static usz alive;
+		static usz i;
+		i++;
+		if (i == 100)
 		{
-			if (val.r == 255) alive ++;
+			alive = 0; i = 0;
+			world_img = rl::loadImageFromTexture(front_tex.texture);
+			defer rl::unloadImage(world_img);
+			foreach (val : ((char[<4>]*)world_img.data)[:WIDTH * HEIGHT]) if (val.r == 255) alive ++;
 		}
+
 		rl::drawFPS(20, 20);
 		@pool()
 		{
-			rl::drawText(string::tformat_zstr("Alive cells: %s", alive), 20, 50, 32, rl::GREEN);
+			rl::drawText(string::tformat_zstr("(%s%%) Alive cells: %s/%s", i, alive, WIDTH * HEIGHT), 20, 50, 32, rl::GREEN);
 			rl::drawText(string::tformat_zstr("camera pos: %s. magnification: %s", camera_pos, magnification), 20, 80, 15, rl::GREEN);
 		};
 		rl::drawText(@sprintf("Grid size: %sx%s", WIDTH, HEIGHT), 20, 100, 20, rl::GREEN);

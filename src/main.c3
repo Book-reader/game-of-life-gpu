@@ -14,11 +14,12 @@ enum Cell : const char
 
 const SCREEN_WIDTH = 1920;
 const SCREEN_HEIGHT = 1080;
-const float SCALE = 0.25; // 0.12; // 0.1178;
+const float SCALE = 0.125; // 0.12; // 0.1178; // 0.125;
 const WIDTH = (usz)(SCREEN_WIDTH / SCALE);
 const HEIGHT = (usz)(SCREEN_HEIGHT / SCALE);
 
-typedef World = Cell[WIDTH][HEIGHT];
+
+typedef World = Cell[WIDTH * 4][HEIGHT];
 
 macro mod(dividend, divisor)
 {
@@ -29,6 +30,8 @@ macro mod(dividend, divisor)
 		default: return (dividend % divisor) + divisor;
 	}
 }
+
+extern fn void rlSetBlendFactorsSeparate(int glSrcRGB, int glDstRGB, int glSrcAlpha, int glDstAlpha, int glEqRGB, int glEqAlpha);
 
 World world;
 
@@ -42,16 +45,17 @@ fn int main(String[] args)
 			world[y][:ln.len] = ln[..];
 		}
 	};
-	if (args.len != 2) foreach (&row : world) foreach (&cell : row) *cell = rnd() > 0.5 ? ALIVE : DEAD;
+	if (args.len != 2) foreach (&row : world) /*foreach (&cell : row) *cell*/for (usz i = 0; i < WIDTH * 4; i+=4) { (*row)[i] = rnd() > 0.5 ? ALIVE : DEAD; (*row)[i + 3] = ALIVE; }
 
 	rl::initWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Game of Life");
 	defer rl::closeWindow();
 
+	$assert WIDTH % 4 == 0;
 	Image world_img = {
 		.data = &world,
-		.width = WIDTH,
+		.width = WIDTH/* / 4*/,
 		.height = HEIGHT,
-		.format = UNCOMPRESSED_GRAYSCALE,
+		.format = UNCOMPRESSED_R8G8B8A8,
 		.mipmaps = 1,
 	};
 	Texture2D world_tex = rl::loadTextureFromImage(world_img);
@@ -71,6 +75,8 @@ fn int main(String[] args)
 
 	rl::setTargetFPS(60);
 
+	// rlSetBlendFactorsSeparate(0, 0x0300, 0, 0x0302, 1, 1);
+
 	Shader render_shader = rl::loadShaderFromMemory(vs: null, fs: RENDER_SHADER);
 	defer rl::unloadShader(render_shader);
 
@@ -85,22 +91,50 @@ fn int main(String[] args)
 	{
 		rl::@textureMode(back_tex)
 		{
+			rl::clearBackground(rl::BLANK);
 			rl::@shaderMode(render_shader)
 			{
-				rl::drawTexture(front_tex.texture, 0, 0, rl::WHITE);
+				rl::@blendMode(3) // 7 = RL_BLEND_CUSTOM_SEPARATE. not in raylib55.c3l so I should fix that
+				{
+					rl::drawTexture(front_tex.texture, 0, 0, rl::WHITE);
+				};
 			};
 		};
 
+/*		{
+			Image img = rl::loadImageFromTexture(back_tex.texture);
+			defer rl::unloadImage(img);
+			foreach (val : ((char[<4>]*)img.data)[:WIDTH * HEIGHT][:10]) io::printfn("%s", val);
+			// return 0;
+		}*/
+
+
 		rl::@textureMode(front_tex)
 		{
-			rl::drawTexture(back_tex.texture, 0, 0, rl::WHITE);
+			rl::clearBackground(rl::BLANK);
+
+			rl::@blendMode(3) // 7 = RL_BLEND_CUSTOM_SEPARATE. not in raylib55.c3l so I should fix that
+			{
+				rl::drawTexture(back_tex.texture, 0, 0, rl::WHITE);
+			};
 		};
+
+/*		{
+			Image img = rl::loadImageFromTexture(front_tex.texture);
+			defer rl::unloadImage(img);
+			foreach (val : ((char[<4>]*)img.data)[:WIDTH * HEIGHT][:10]) io::printfn("%s", val);
+			// return 0;
+		}*/
+
 
 		rl::setShaderValue(scaling_shader, mag_loc, &magnification, FLOAT);
 		rl::setShaderValue(scaling_shader, cpos_loc, &camera_pos, VEC2);
 		rl::@shaderMode(scaling_shader)
 		{
-			rl::drawTextureEx(front_tex.texture, {0, 0}, 0.0, SCALE, rl::WHITE);
+			// rl::@blendMode(6)
+			{
+				rl::drawTextureEx(front_tex.texture, {0, 0}, 0.0, SCALE, rl::WHITE);
+			};
 		};
 
 		const ZOOM_STEP = 0.95;
@@ -189,7 +223,42 @@ vec4 getPixelAtOffset(float x, float y)
 void main()
 {
 	vec4 texelColor = getCoords()*colDiffuse*fragColor;
+//	for (int i = 0; i <= 4; i++)
 
+	vec4 left = getPixelAtOffset(-1.0, 0.0);
+	vec4 right = getPixelAtOffset(1.0, 0.0);
+
+	vec4 above = getPixelAtOffset(0.0, -1.0);
+	vec4 above_left = getPixelAtOffset(-1.0, -1.0);
+	vec4 above_right = getPixelAtOffset(1.0, -1.0);
+
+	vec4 below = getPixelAtOffset(0.0, 1.0);
+	vec4 below_left = getPixelAtOffset(-1.0, 1.0);
+	vec4 below_right = getPixelAtOffset(1.0, 1.0);
+
+	// First, the R channel
+	int count = 0;
+	count += int(left[0] == 1.0);
+	count += int(above_left[0] == 1.0);
+	count += int(below_left[0] == 1.0);
+	count += int(right[0] == 1.0);
+	count += int(above_right[0] == 1.0);
+	count += int(below_right[0] == 1.0);
+	count += int(above[0] == 1.0);
+	count += int(below[0] == 1.0);
+
+
+	if (texelColor[0] == 0.0)
+	{
+		finalColor = count == 3 ? vec4(1.0, 0.0, 0.0, 0.5) : vec4(0.0, 0.0, 0.0, 0.5);
+	}
+	else
+	{
+		finalColor = count == 3 || count == 2 ? vec4(1.0, 0.0, 0.0, 0.5) : vec4(0.0, 0.0, 0.0, 0.5);
+	}
+	// finalColor = vec4(fragTexCoord, 0.0, 1.0);
+	// finalColor = vec4(1.0, 0.5, 0.25, 0.125);
+/*
 	int count = 0;
 	count += int(getPixelAtOffset(-1.0, -1) == ALIVE);
 	count += int(getPixelAtOffset(-1.0, 0.0) == ALIVE);
@@ -209,9 +278,27 @@ void main()
 	else
 	{
 		finalColor = count == 3 || count == 2 ? ALIVE : DEAD;
-	}
+	}*/
 }
 `, WIDTH, HEIGHT);
+
+/*const SCALING_SHADER =
+`
+#version 330
+in vec2 fragTexCoord;
+in vec4 fragColor;
+
+uniform sampler2D texture0;
+uniform vec4 colDiffuse;
+
+out vec4 finalColor;
+
+void main()
+{
+	finalColor = vec4(fragTexCoord, 0.0, 1.0);
+}
+`;*/
+
 
 const SCALING_SHADER =
 `
@@ -236,6 +323,7 @@ vec4 getCoords()
 void main()
 {
 	vec4 texelColor = getCoords()*colDiffuse*fragColor;
-	finalColor = texelColor;
+	finalColor = vec4(texelColor.rgb, 1.0);
 }
 `;
+

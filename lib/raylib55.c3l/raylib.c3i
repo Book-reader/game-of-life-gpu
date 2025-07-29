@@ -1957,10 +1957,10 @@ macro void @shaderMode(Shader shader ;@body)
  Setup blending mode, then calls [block].
  blend mode will end after [block] has finished.
 *>
-macro void @blendMode(BlendMode mode ;@body)
+macro void @blendMode(int mode ;@body)
 {
-  beginShaderMode(mode);
-  defer endShaderMode();
+  beginBlendMode(mode);
+  defer endBlendMode();
   @body();
 }
 
@@ -2280,7 +2280,7 @@ fn void rlTranslatef(float x, float y, float z) @extern("rlTranslatef");
 // Set blending mode factor and equation
 fn void rlSetBlendFactors(int glSrcFactor, int glDstFactor, int glEquation) @extern("rlSetBlendFactors");
 // Set blend mode
-fn void rlSetBlendMode(BlendMode mode) @extern("rlSetBlendMode");
+fn void rlSetBlendMode(int mode) @extern("rlSetBlendMode");
 // Update and draw internal render batch
 fn void rlDrawRenderBatchActive() @extern("rlDrawRenderBatchActive");
 

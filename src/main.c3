@@ -83,7 +83,7 @@ fn int main(String[] args)
 		};
 	};
 
-	// rl::setTargetFPS(10);
+	rl::setTargetFPS(60);
 
 	// rlSetBlendFactorsSeparate(0, 0x0300, 0, 0x0302, 1, 1);
 

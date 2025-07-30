@@ -14,7 +14,7 @@ enum Cell : const char
 
 const SCREEN_WIDTH = 1920;
 const SCREEN_HEIGHT = 1080;
-const double SCALE = 0.125; // 0.12; // 0.1178; // 0.125;
+const double SCALE = 8.0; // 0.12; // 0.1178; // 0.125;
 const WIDTH = (usz)(SCREEN_WIDTH / SCALE);
 const HEIGHT = (usz)(SCREEN_HEIGHT / SCALE);
 
@@ -22,7 +22,7 @@ $assert WIDTH % 4 == 0;
 const ACTUAL_WIDTH = WIDTH / 4;
 const ACTUAL_HEIGHT = HEIGHT;
 
-
+// TODO: I could pack a 4x4 or 2x2 grid into each cell. would probably cause even more rendering errors though
 typedef World = Cell[4][ACTUAL_WIDTH][ACTUAL_HEIGHT];
 
 macro mod(dividend, divisor)
@@ -43,17 +43,20 @@ fn int main(String[] args)
 {
 	if (args.len == 2) @pool()
 	{
-	/*	String file = (String)file::load(tmem, args[1])!!;
+		String file = (String)file::load(tmem, args[1])!!;
 		foreach (y, ln: *(Cell[][]*)&&load::decode(tmem, file))
 		{
-			world[y][:ln.len] = ln[..];
-		}*/
-		abort("loading files broke and I haven't fixed it yet");
+			foreach (x, c : ln)
+			{
+				world[y + ACTUAL_HEIGHT / 2][x / 4 + ACTUAL_WIDTH / 2][x % 4] = c;
+			}
+		}
+		// abort("loading files broke and I haven't fixed it yet");
 	};
 	if (args.len != 2) foreach (&row : world) foreach (&cell : row) foreach (&pixel : cell) *pixel = rnd() > 0.5 ? ALIVE : DEAD;
-	world[0][0][1] = ALIVE;
+	/*world[0][0][1] = ALIVE;
 	world[1][0][2] = ALIVE;
-	world[2][0][0..2] = ALIVE;
+	world[2][0][0..2] = ALIVE;*/
 
 	rl::initWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Game of Life");
 	defer rl::closeWindow();
@@ -187,7 +190,7 @@ fn int main(String[] args)
 		static usz alive;
 		static usz i;
 		i++;
-		if (i == 1000)
+		if (i == 500)
 		{
 			alive = 0; i = 0;
 			world_img = rl::loadImageFromTexture(front_tex.texture);
@@ -198,7 +201,7 @@ fn int main(String[] args)
 		rl::drawFPS(20, 20);
 		@pool()
 		{
-			rl::drawText(string::tformat_zstr("(%s%%) Alive cells: %s/%s", i/10, alive, WIDTH * HEIGHT), 20, 50, 32, rl::GREEN);
+			rl::drawText(string::tformat_zstr("(%s%%) Alive cells: %s/%s", i / 5, alive, WIDTH * HEIGHT), 20, 50, 32, rl::GREEN);
 			rl::drawText(string::tformat_zstr("camera pos: %s. magnification: %s", camera_pos, magnification), 20, 80, 15, rl::GREEN);
 		};
 		rl::drawText(@sprintf("Grid size: %sx%s (actual: 4x%sx%s)", WIDTH, HEIGHT, ACTUAL_WIDTH, ACTUAL_HEIGHT), 20, 100, 20, rl::GREEN);
@@ -317,8 +320,8 @@ uniform vec2 camera_pos = vec2(0.0, 0.0);
 
 float getPixel()
 {
-	vec2 pos = (vec2(fragTexCoord.x, -fragTexCoord.y) / magnification) + vec2(camera_pos.x * 2.0, -camera_pos.y);
-	return (texture(texture0,  vec2(pos.x / 4.0, pos.y))*colDiffuse*fragColor)[int((fragTexCoord.x / magnification + camera_pos.x * 2.0) * WIDTH) %% 4];
+	vec2 pos = (vec2(fragTexCoord.x, -fragTexCoord.y) / magnification) + vec2(camera_pos.x * 4.0, -camera_pos.y);
+	return (texture(texture0,  vec2(pos.x / 4.0, pos.y))*colDiffuse*fragColor)[int((fragTexCoord.x / magnification + camera_pos.x * 4.0) * WIDTH) %% 4];
 }
 
 vec4 getCoords()

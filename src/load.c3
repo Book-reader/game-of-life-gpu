@@ -2,14 +2,20 @@ module load;
 import std::collections::list;
 
 alias Chars = List {char};
-
+import std::io;
 fn char[][] decode(Allocator alloc, String data) => @pool()
 {
+	bool comments = false;
 	List {Chars} chars;
 	String[] split = data.tsplit("\n");
 	foreach (i, line : split)
 	{
-		if (line.len == 0 || line[0] == '!') continue;
+		if (!comments)
+		{
+			if (line[0] != '!') comments = true;
+			continue;
+		}
+		// if (line.len == 0 || line[0] == '!') continue;
 		chars.push({});
 		foreach (ch : line)
 		{
@@ -29,6 +35,10 @@ fn char[][] decode(Allocator alloc, String data) => @pool()
 	foreach (i, &val : res)
 	{
 		*val = chars[i].to_array(alloc);
+	}
+	foreach (line : res)
+	{
+		io::printfn("%s", line);
 	}
 	return res;
 }

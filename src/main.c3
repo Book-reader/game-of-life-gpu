@@ -14,7 +14,7 @@ enum Cell : const char
 
 const SCREEN_WIDTH = 1920;
 const SCREEN_HEIGHT = 1080;
-const double SCALE = 0.08; // 0.12; // 0.1178; // 0.125;
+const double SCALE = 0.125; // 0.12; // 0.1178; // 0.125;
 const WIDTH = (usz)(SCREEN_WIDTH / SCALE);
 const HEIGHT = (usz)(SCREEN_HEIGHT / SCALE);
 
@@ -169,7 +169,7 @@ fn int main(String[] args)
 		}
 		if (rl::isKeyDown(rl::KEY_DOWN))
 		{
-			camera_pos.y += MOVE_STEP / magnification;
+			camera_pos.y += MOVE_STEP/ magnification;
 		}
 		if (rl::isKeyDown(rl::KEY_LEFT))
 		{
@@ -317,12 +317,8 @@ uniform vec2 camera_pos = vec2(0.0, 0.0);
 
 float getPixel()
 {
-	// vec2 pos = vec2((int(fragTexCoord.x * WIDTH) %% 4) / WIDTH, -fragTexCoord.y);
-	// return texture(texture0, pos)[int(fragTexCoord.x * WIDTH) %% 4];
-	// return texture(texture0, (vec2(fragTexCoord.x, -fragTexCoord.y) / magnification) + vec2(camera_pos.x, -camera_pos.y));
-	// return 0.0;
-	vec2 pos = (vec2(fragTexCoord.x, -fragTexCoord.y) / magnification) + vec2(camera_pos.x, -camera_pos.y);
-	return (texture(texture0,  vec2(pos.x / 4.0, pos.y))*colDiffuse*fragColor)[int(fragTexCoord.x * WIDTH / magnification) %% 4];
+	vec2 pos = (vec2(fragTexCoord.x, -fragTexCoord.y) / magnification) + vec2(camera_pos.x * 2.0, -camera_pos.y);
+	return (texture(texture0,  vec2(pos.x / 4.0, pos.y))*colDiffuse*fragColor)[int((fragTexCoord.x / magnification + camera_pos.x * 2.0) * WIDTH) %% 4];
 }
 
 vec4 getCoords()

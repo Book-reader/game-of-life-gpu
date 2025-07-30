@@ -14,7 +14,7 @@ enum Cell : const char
 
 const SCREEN_WIDTH = 1920;
 const SCREEN_HEIGHT = 1080;
-const float SCALE = 0.125; // 0.12; // 0.1178; // 0.125;
+const float SCALE = 4.0; // 0.12; // 0.1178; // 0.125;
 const WIDTH = (usz)(SCREEN_WIDTH / SCALE);
 const HEIGHT = (usz)(SCREEN_HEIGHT / SCALE);
 
@@ -45,7 +45,7 @@ fn int main(String[] args)
 			world[y][:ln.len] = ln[..];
 		}
 	};
-	if (args.len != 2) foreach (&row : world) /*foreach (&cell : row) *cell*/for (usz i = 0; i < WIDTH * 4; i+=4) { (*row)[i] = rnd() > 0.5 ? ALIVE : DEAD; (*row)[i + 3] = ALIVE; }
+	if (args.len != 2) foreach (&row : world) /*foreach (&cell : row) *cell*/for (usz i = 0; i < WIDTH * 4; i++) (*row)[i] = rnd() > 0.5 ? ALIVE : DEAD;
 
 	rl::initWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Game of Life");
 	defer rl::closeWindow();
@@ -177,7 +177,7 @@ fn int main(String[] args)
 			alive = 0; i = 0;
 			world_img = rl::loadImageFromTexture(front_tex.texture);
 			defer rl::unloadImage(world_img);
-			foreach (val : ((char[<4>]*)world_img.data)[:WIDTH * HEIGHT]) if (val.r == 255) alive ++;
+			foreach (val : ((char*)world_img.data)[:WIDTH * 4 * HEIGHT]) if (val == 255) alive ++;
 		}
 
 		rl::drawFPS(20, 20);
@@ -236,49 +236,31 @@ void main()
 	vec4 below_left = getPixelAtOffset(-1.0, 1.0);
 	vec4 below_right = getPixelAtOffset(1.0, 1.0);
 
-	// First, the R channel
-	int count = 0;
-	count += int(left[0] == 1.0);
-	count += int(above_left[0] == 1.0);
-	count += int(below_left[0] == 1.0);
-	count += int(right[0] == 1.0);
-	count += int(above_right[0] == 1.0);
-	count += int(below_right[0] == 1.0);
-	count += int(above[0] == 1.0);
-	count += int(below[0] == 1.0);
-
-
-	if (texelColor[0] == 0.0)
+	for (int i = 0; i < 4; i++)
 	{
-		finalColor = count == 3 ? vec4(1.0, 0.0, 0.0, 0.5) : vec4(0.0, 0.0, 0.0, 0.5);
+		// First, the R channel
+		int count = 0;
+		count += int(left[i] == 1.0);
+		count += int(above_left[i] == 1.0);
+		count += int(below_left[i] == 1.0);
+		count += int(right[i] == 1.0);
+		count += int(above_right[i] == 1.0);
+		count += int(below_right[i] == 1.0);
+		count += int(above[i] == 1.0);
+		count += int(below[i] == 1.0);
+
+
+		if (texelColor[i] == 0.0)
+		{
+			finalColor[i] = float(count == 3);// ? 1.0, 0.0, 0.0, 0.0) : vec4(0.0, 0.0, 0.0, 0.0);
+		}
+		else
+		{
+			finalColor[i] = float(count == 3 || count == 2); // ? vec4(1.0, 0.0, 0.0, 0.0) : vec4(0.0, 0.0, 0.0, 0.0);
+		}
 	}
-	else
-	{
-		finalColor = count == 3 || count == 2 ? vec4(1.0, 0.0, 0.0, 0.5) : vec4(0.0, 0.0, 0.0, 0.5);
-	}
-	// finalColor = vec4(fragTexCoord, 0.0, 1.0);
-	// finalColor = vec4(1.0, 0.5, 0.25, 0.125);
-/*
-	int count = 0;
-	count += int(getPixelAtOffset(-1.0, -1) == ALIVE);
-	count += int(getPixelAtOffset(-1.0, 0.0) == ALIVE);
-	count += int(getPixelAtOffset(-1.0, 1.0) == ALIVE);
 
-	count += int(getPixelAtOffset(0.0, -1.0) == ALIVE);
-	count += int(getPixelAtOffset(0.0, 1.0) == ALIVE);
-
-	count += int(getPixelAtOffset(1.0, -1.0) == ALIVE);
-	count += int(getPixelAtOffset(1.0, 0.0) == ALIVE);
-	count += int(getPixelAtOffset(1.0, 1.0) == ALIVE);
-
-	if (texelColor == DEAD)
-	{
-		finalColor = count == 3 ? ALIVE : DEAD;
-	}
-	else
-	{
-		finalColor = count == 3 || count == 2 ? ALIVE : DEAD;
-	}*/
+	// finalColor.gba = vec3(0.0);
 }
 `, WIDTH, HEIGHT);
 

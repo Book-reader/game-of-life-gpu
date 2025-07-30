@@ -14,7 +14,7 @@ enum Cell : const char
 
 const SCREEN_WIDTH = 1920;
 const SCREEN_HEIGHT = 1080;
-const float SCALE = 4.0; // 0.12; // 0.1178; // 0.125;
+const float SCALE = 1.0; // 0.12; // 0.1178; // 0.125;
 const WIDTH = (usz)(SCREEN_WIDTH / SCALE);
 const HEIGHT = (usz)(SCREEN_HEIGHT / SCALE);
 
@@ -37,7 +37,7 @@ World world;
 
 fn int main(String[] args)
 {
-	if (args.len == 2) @pool()
+	/*if (args.len == 2) @pool()
 	{
 		String file = (String)file::load(tmem, args[1])!!;
 		foreach (y, ln: *(Cell[][]*)&&load::decode(tmem, file))
@@ -45,7 +45,10 @@ fn int main(String[] args)
 			world[y][:ln.len] = ln[..];
 		}
 	};
-	if (args.len != 2) foreach (&row : world) /*foreach (&cell : row) *cell*/for (usz i = 0; i < WIDTH * 4; i++) (*row)[i] = rnd() > 0.5 ? ALIVE : DEAD;
+	if (args.len != 2) foreach (&row : world) /*foreach (&cell : row) *cell*/for (usz i = 0; i < WIDTH * 4; i++) (*row)[i] = rnd() > 0.5 ? ALIVE : DEAD;*/
+	world[0][1] = ALIVE;
+	world[1][2] = ALIVE;
+	world[2][0..2] = ALIVE;
 
 	rl::initWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Game of Life");
 	defer rl::closeWindow();
@@ -70,7 +73,10 @@ fn int main(String[] args)
 	// Initial copy of randomised world texture onto the front buffer
 	rl::@textureMode(front_tex)
 	{
-		rl::drawTexture(world_tex, 0, 0, rl::WHITE);
+		rl::@blendMode(3)
+		{
+			rl::drawTexture(world_tex, 0, 0, rl::WHITE);
+		};
 	};
 
 	rl::setTargetFPS(60);
@@ -101,7 +107,7 @@ fn int main(String[] args)
 			};
 		};
 
-/*		{
+		/*{
 			Image img = rl::loadImageFromTexture(back_tex.texture);
 			defer rl::unloadImage(img);
 			foreach (val : ((char[<4>]*)img.data)[:WIDTH * HEIGHT][:10]) io::printfn("%s", val);
@@ -127,11 +133,12 @@ fn int main(String[] args)
 		}*/
 
 
+		rl::clearBackground(rl::BLANK);
 		rl::setShaderValue(scaling_shader, mag_loc, &magnification, FLOAT);
 		rl::setShaderValue(scaling_shader, cpos_loc, &camera_pos, VEC2);
 		rl::@shaderMode(scaling_shader)
 		{
-			// rl::@blendMode(6)
+			// rl::@blendMode(3)
 			{
 				rl::drawTextureEx(front_tex.texture, {0, 0}, 0.0, SCALE, rl::WHITE);
 			};
@@ -236,16 +243,17 @@ void main()
 	vec4 below_left = getPixelAtOffset(-1.0, 1.0);
 	vec4 below_right = getPixelAtOffset(1.0, 1.0);
 
+	// TODO: unroll manually if it significantly impacts performance
 	for (int i = 0; i < 4; i++)
 	{
 		// First, the R channel
 		int count = 0;
-		count += int(left[i] == 1.0);
-		count += int(above_left[i] == 1.0);
-		count += int(below_left[i] == 1.0);
-		count += int(right[i] == 1.0);
-		count += int(above_right[i] == 1.0);
-		count += int(below_right[i] == 1.0);
+		count += i == 0 ? int(left[3] == 1.0) : int(texelColor[i - 1] == 1.0);
+		count += i == 0 ? int(above_left[3] == 1.0) : int(above[i - 1] == 1.0);
+		count += i == 0 ? int(below_left[3] == 1.0) : int(below[i - 1] == 1.0);
+		count += i == 3 ? int(right[0] == 1.0) : int(texelColor[i + 1] == 1.0);
+		count += i == 3 ? int(above_right[0] == 1.0) : int(above[i + 1] == 1.0);
+		count += i == 3 ? int(below_right[0] == 1.0) : int(below[i + 1] == 1.0);
 		count += int(above[i] == 1.0);
 		count += int(below[i] == 1.0);
 
@@ -305,7 +313,7 @@ vec4 getCoords()
 void main()
 {
 	vec4 texelColor = getCoords()*colDiffuse*fragColor;
-	finalColor = vec4(texelColor.rgb, 1.0);
+	finalColor = vec4(texelColor.rgb, texelColor.a + 0.5);
 }
 `;
 

@@ -14,12 +14,16 @@ enum Cell : const char
 
 const SCREEN_WIDTH = 1920;
 const SCREEN_HEIGHT = 1080;
-const float SCALE = 1.0; // 0.12; // 0.1178; // 0.125;
+const double SCALE = 40; // 0.12; // 0.1178; // 0.125;
 const WIDTH = (usz)(SCREEN_WIDTH / SCALE);
 const HEIGHT = (usz)(SCREEN_HEIGHT / SCALE);
 
+$assert WIDTH % 4 == 0;
+const ACTUAL_WIDTH = WIDTH / 4;
+const ACTUAL_HEIGHT = HEIGHT;
 
-typedef World = Cell[WIDTH * 4][HEIGHT];
+
+typedef World = Cell[4][ACTUAL_WIDTH][ACTUAL_HEIGHT];
 
 macro mod(dividend, divisor)
 {
@@ -45,29 +49,28 @@ fn int main(String[] args)
 			world[y][:ln.len] = ln[..];
 		}
 	};
-	if (args.len != 2) foreach (&row : world) /*foreach (&cell : row) *cell*/for (usz i = 0; i < WIDTH * 4; i++) (*row)[i] = rnd() > 0.5 ? ALIVE : DEAD;*/
-	world[0][1] = ALIVE;
-	world[1][2] = ALIVE;
-	world[2][0..2] = ALIVE;
+	if (args.len != 2) foreach (&row : world) /*foreach (&cell : row) *cell*/for (usz i = 0; i < WIDTH; i++) (*row)[i] = rnd() > 0.5 ? ALIVE : DEAD;*/
+	world[0][0][1] = ALIVE;
+	world[1][0][2] = ALIVE;
+	world[2][0][0..2] = ALIVE;
 
 	rl::initWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Game of Life");
 	defer rl::closeWindow();
 
-	$assert WIDTH % 4 == 0;
 	Image world_img = {
 		.data = &world,
-		.width = WIDTH/* / 4*/,
-		.height = HEIGHT,
+		.width = ACTUAL_WIDTH,
+		.height = ACTUAL_HEIGHT,
 		.format = UNCOMPRESSED_R8G8B8A8,
 		.mipmaps = 1,
 	};
 	Texture2D world_tex = rl::loadTextureFromImage(world_img);
 	defer rl::unloadTexture(world_tex);
 
-	RenderTexture2D front_tex = rl::loadRenderTexture(WIDTH, HEIGHT);
+	RenderTexture2D front_tex = rl::loadRenderTexture(ACTUAL_WIDTH, ACTUAL_HEIGHT);
 	defer rl::unloadRenderTexture(front_tex);
 
-	RenderTexture2D back_tex = rl::loadRenderTexture(WIDTH, HEIGHT);
+	RenderTexture2D back_tex = rl::loadRenderTexture(ACTUAL_WIDTH, ACTUAL_HEIGHT);
 	defer rl::unloadRenderTexture(back_tex);
 
 	// Initial copy of randomised world texture onto the front buffer
@@ -107,11 +110,15 @@ fn int main(String[] args)
 			};
 		};
 
-		/*{
+/*		{
 			Image img = rl::loadImageFromTexture(back_tex.texture);
 			defer rl::unloadImage(img);
-			foreach (val : ((char[<4>]*)img.data)[:WIDTH * HEIGHT][:10]) io::printfn("%s", val);
+			// foreach (val : ((char[<4>]*)img.data)[:ACTUAL_WIDTH * ACTUAL_HEIGHT][:20]) io::printfn("%s", val);
 			// return 0;
+			foreach (row : (*(World*)img.data))
+			{
+				io::printfn("%s", row);
+			}
 		}*/
 
 
@@ -184,7 +191,7 @@ fn int main(String[] args)
 			alive = 0; i = 0;
 			world_img = rl::loadImageFromTexture(front_tex.texture);
 			defer rl::unloadImage(world_img);
-			foreach (val : ((char*)world_img.data)[:WIDTH * 4 * HEIGHT]) if (val == 255) alive ++;
+			foreach (val : ((char*)world_img.data)[:World.sizeof]) if (val == 255) alive ++;
 		}
 
 		rl::drawFPS(20, 20);
@@ -193,7 +200,7 @@ fn int main(String[] args)
 			rl::drawText(string::tformat_zstr("(%s%%) Alive cells: %s/%s", i, alive, WIDTH * HEIGHT), 20, 50, 32, rl::GREEN);
 			rl::drawText(string::tformat_zstr("camera pos: %s. magnification: %s", camera_pos, magnification), 20, 80, 15, rl::GREEN);
 		};
-		rl::drawText(@sprintf("Grid size: %sx%s", WIDTH, HEIGHT), 20, 100, 20, rl::GREEN);
+		rl::drawText(@sprintf("Grid size: %sx%s (actual: 4x%sx%s)", WIDTH, HEIGHT, ACTUAL_WIDTH, ACTUAL_HEIGHT), 20, 100, 20, rl::GREEN);
 	};
 
 	
@@ -270,7 +277,7 @@ void main()
 
 	// finalColor.gba = vec3(0.0);
 }
-`, WIDTH, HEIGHT);
+`, ACTUAL_WIDTH, ACTUAL_HEIGHT);
 
 /*const SCALING_SHADER =
 `
@@ -290,7 +297,7 @@ void main()
 `;*/
 
 
-const SCALING_SHADER =
+const SCALING_SHADER = @sprintf(
 `
 #version 330
 in vec2 fragTexCoord;
@@ -304,6 +311,17 @@ out vec4 finalColor;
 uniform float magnification = 1.0;
 uniform vec2 camera_pos = vec2(0.0, 0.0);
 
+#define WIDTH %s
+#define HEIGHT %s
+
+float getPixel()
+{
+	// vec2 pos = vec2((int(fragTexCoord.x * WIDTH) %% 4) / WIDTH, -fragTexCoord.y);
+	// return texture(texture0, pos)[int(fragTexCoord.x * WIDTH) %% 4];
+	// return texture(texture0, (vec2(fragTexCoord.x, -fragTexCoord.y) / magnification) + vec2(camera_pos.x, -camera_pos.y));
+	return 0.0;
+}
+
 vec4 getCoords()
 {
 	// this inverts the Y coordinate to unflip the image to the correct orientation
@@ -314,6 +332,6 @@ void main()
 {
 	vec4 texelColor = getCoords()*colDiffuse*fragColor;
 	finalColor = vec4(texelColor.rgb, texelColor.a + 0.5);
+	// finalColor = getPixel() == 1.0 ? vec4(1.0, 1.0, 1.0, 1.0) : vec4(0.0, 0.0, 0.0, 1.0);
 }
-`;
-
+`, ACTUAL_WIDTH, ACTUAL_HEIGHT);

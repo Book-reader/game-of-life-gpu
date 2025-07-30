@@ -14,7 +14,7 @@ enum Cell : const char
 
 const SCREEN_WIDTH = 1920;
 const SCREEN_HEIGHT = 1080;
-const double SCALE = 40; // 0.12; // 0.1178; // 0.125;
+const double SCALE = 0.08; // 0.12; // 0.1178; // 0.125;
 const WIDTH = (usz)(SCREEN_WIDTH / SCALE);
 const HEIGHT = (usz)(SCREEN_HEIGHT / SCALE);
 
@@ -41,15 +41,16 @@ World world;
 
 fn int main(String[] args)
 {
-	/*if (args.len == 2) @pool()
+	if (args.len == 2) @pool()
 	{
-		String file = (String)file::load(tmem, args[1])!!;
+	/*	String file = (String)file::load(tmem, args[1])!!;
 		foreach (y, ln: *(Cell[][]*)&&load::decode(tmem, file))
 		{
 			world[y][:ln.len] = ln[..];
-		}
+		}*/
+		abort("loading files broke and I haven't fixed it yet");
 	};
-	if (args.len != 2) foreach (&row : world) /*foreach (&cell : row) *cell*/for (usz i = 0; i < WIDTH; i++) (*row)[i] = rnd() > 0.5 ? ALIVE : DEAD;*/
+	if (args.len != 2) foreach (&row : world) foreach (&cell : row) foreach (&pixel : cell) *pixel = rnd() > 0.5 ? ALIVE : DEAD;
 	world[0][0][1] = ALIVE;
 	world[1][0][2] = ALIVE;
 	world[2][0][0..2] = ALIVE;
@@ -82,7 +83,7 @@ fn int main(String[] args)
 		};
 	};
 
-	rl::setTargetFPS(60);
+	// rl::setTargetFPS(10);
 
 	// rlSetBlendFactorsSeparate(0, 0x0300, 0, 0x0302, 1, 1);
 
@@ -147,7 +148,7 @@ fn int main(String[] args)
 		{
 			// rl::@blendMode(3)
 			{
-				rl::drawTextureEx(front_tex.texture, {0, 0}, 0.0, SCALE, rl::WHITE);
+				rl::drawTexturePro(front_tex.texture, {0, 0, WIDTH, HEIGHT}, {0, 0, WIDTH * SCALE, HEIGHT * SCALE}, {0, 0}, 0.0, rl::WHITE);
 			};
 		};
 
@@ -186,7 +187,7 @@ fn int main(String[] args)
 		static usz alive;
 		static usz i;
 		i++;
-		if (i == 100)
+		if (i == 1000)
 		{
 			alive = 0; i = 0;
 			world_img = rl::loadImageFromTexture(front_tex.texture);
@@ -197,7 +198,7 @@ fn int main(String[] args)
 		rl::drawFPS(20, 20);
 		@pool()
 		{
-			rl::drawText(string::tformat_zstr("(%s%%) Alive cells: %s/%s", i, alive, WIDTH * HEIGHT), 20, 50, 32, rl::GREEN);
+			rl::drawText(string::tformat_zstr("(%s%%) Alive cells: %s/%s", i/10, alive, WIDTH * HEIGHT), 20, 50, 32, rl::GREEN);
 			rl::drawText(string::tformat_zstr("camera pos: %s. magnification: %s", camera_pos, magnification), 20, 80, 15, rl::GREEN);
 		};
 		rl::drawText(@sprintf("Grid size: %sx%s (actual: 4x%sx%s)", WIDTH, HEIGHT, ACTUAL_WIDTH, ACTUAL_HEIGHT), 20, 100, 20, rl::GREEN);
@@ -319,7 +320,9 @@ float getPixel()
 	// vec2 pos = vec2((int(fragTexCoord.x * WIDTH) %% 4) / WIDTH, -fragTexCoord.y);
 	// return texture(texture0, pos)[int(fragTexCoord.x * WIDTH) %% 4];
 	// return texture(texture0, (vec2(fragTexCoord.x, -fragTexCoord.y) / magnification) + vec2(camera_pos.x, -camera_pos.y));
-	return 0.0;
+	// return 0.0;
+	vec2 pos = (vec2(fragTexCoord.x, -fragTexCoord.y) / magnification) + vec2(camera_pos.x, -camera_pos.y);
+	return (texture(texture0,  vec2(pos.x / 4.0, pos.y))*colDiffuse*fragColor)[int(fragTexCoord.x * WIDTH / magnification) %% 4];
 }
 
 vec4 getCoords()
@@ -330,8 +333,9 @@ vec4 getCoords()
 
 void main()
 {
-	vec4 texelColor = getCoords()*colDiffuse*fragColor;
-	finalColor = vec4(texelColor.rgb, texelColor.a + 0.5);
-	// finalColor = getPixel() == 1.0 ? vec4(1.0, 1.0, 1.0, 1.0) : vec4(0.0, 0.0, 0.0, 1.0);
+	// vec4 texelColor = getCoords()*colDiffuse*fragColor;
+	// finalColor = vec4(texelColor.rgb, texelColor.a + 0.5);
+	finalColor = getPixel() == 1.0 ? vec4(1.0, 1.0, 1.0, 1.0) : vec4(0.0, 0.0, 0.0, 1.0);
 }
 `, ACTUAL_WIDTH, ACTUAL_HEIGHT);
+

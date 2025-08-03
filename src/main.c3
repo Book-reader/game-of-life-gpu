@@ -49,9 +49,9 @@ macro emit_event(int[<2>] pos) => next_queue.push(pos);
 fn int main(String[] args)
 {
 	// this allocator stuff is a desparate attempt to reduce the cost of allocating each event in the heap
-	// idk if it actually makes much of a difference though
-	char[] _mem = mem::new_array(char, 200 * mem::MB);
-	char[] _mem1 = mem::new_array(char, 200 * mem::MB);
+	// the difference is pretty small though, once the grid stabilises at ~11k events/frame using mem gives ~280 fps and using arenas gives ~300 fps
+	char[] _mem = mem::new_array(char, 200 * /*mem::MB*/ (1024 * 1024));
+	char[] _mem1 = mem::new_array(char, 200 * /*mem::MB*/ (1024 * 1024));
 	defer mem::free(_mem);
 	defer mem::free(_mem1);
 	ArenaAllocator* alloc = allocator::wrap(_mem);

@@ -9,7 +9,7 @@ import std::math::random;
 
 const int[<2>] SCREEN_SIZE = {1400, 950};
 const int[<2>] GRID_SIZE = {SCREEN_SIZE.x / CELL_SIZE, SCREEN_SIZE.y / CELL_SIZE};
-const int CELL_SIZE = 2;
+const int CELL_SIZE = 1;
 
 const int[<2>][*] NBOR_OFFSETS = {
 	{-1, -1}, {0, -1}, {1, -1},
@@ -29,7 +29,12 @@ const int[<2>][*] OFFSETS = {
 	bool alive;
 	char neighbours;
 }*/
-bitstruct Cell : char
+/*bitstruct Cell : char
+{
+	bool alive;
+	bool notified;
+}*/
+struct Cell
 {
 	bool alive;
 	bool notified;
@@ -66,16 +71,24 @@ enum EventType : char
 	_CHANGED,
 }
 LinkedList {int[2]} event_queue;
-// LinkedList {int[2]} next_queue;
+LinkedList {int[2]} next_queue;
 
 HashMap {int, HashMap {int, bool}} a;
 
-macro emit_event(int[<2>] pos) => event_queue.push(pos);
+macro emit_event(int[<2>] pos) => next_queue.push(pos);
 
 fn int main(String[] args)
 {
-	event_queue.init(mem);
+	char[] _mem = mem::new_array(char, 200 * mem::MB);
+	defer mem::free(_mem);
+	ArenaAllocator* alloc = allocator::wrap(_mem);
+	char[] _mem1 = mem::new_array(char, 200 * mem::MB);
+	defer mem::free(_mem1);
+	ArenaAllocator* alloc1 = allocator::wrap(_mem1);
+	event_queue.init(alloc);
 	defer event_queue.free();
+	next_queue.init(alloc1);
+	defer next_queue.free();
 
 	foreach (uint y, &row : back) foreach (uint x, cell : row)
 	{
@@ -95,22 +108,27 @@ fn int main(String[] args)
 	(*back)[2][0].alive = true;
 	(*back)[2][1].alive = true;
 	(*back)[2][2].alive = true;
+	// foreach (int y, &row : back) foreach (int x, cell : row) emit_event({x, y});
+	// foreach (int y, &row : back) foreach (int x, cell : row) if (cell.alive) alive ++;
 
 	rl::initWindow(...SCREEN_SIZE, "Game of life on CPU");
 	defer rl::closeWindow();
-//	rl::setTargetFPS(60);
-
+	// rl::setTargetFPS(60);
+	rl::@drawing() {rl::clearBackground(rl::BLACK);};
+	//isz alive;
 	while (!rl::windowShouldClose()) rl::@drawing()
 	{
-		// rl::clearBackground(rl::BLACK);
-		usz alive;
-		usz events = event_queue.len();
-		io::printfn("got %s events", events);
-		while (events-- > 0)
-		{
-			int[<2>] pos = event_queue.pop_front()!!;
+		@swap(event_queue, next_queue);
+		@swap(alloc, alloc1);
+		alloc1.clear();
 
-			// rl::drawRectangle(pos.x * CELL_SIZE, pos.y * CELL_SIZE, CELL_SIZE, CELL_SIZE, front.get(pos).alive ? rl::WHITE : rl::BLACK);
+		rl::clearBackground(rl::BLACK);
+		usz alive;
+		// io::printfn("got %s events", event_queue.len());
+		while (try int[<2>] pos = event_queue.pop_front())
+		{
+			// rl::drawRectangle(pos.x * CELL_SIZE, pos.y * CELL_SIZE, CELL_SIZE, CELL_SIZE, rl::RED);
+			// rl::drawRectangle(pos.x * CELL_SIZE, pos.y * CELL_SIZE, CELL_SIZE, CELL_SIZE, back.get(pos).alive ? rl::WHITE : rl::BLACK);
 			// rl::drawRectangle(...pos * CELL_SIZE, CELL_SIZE, CELL_SIZE, back.get(pos).alive ? rl::WHITE : rl::BLACK);
 			foreach (off : OFFSETS)
 			{
@@ -123,12 +141,15 @@ fn int main(String[] args)
 				if (back.get(pos1).alive)
 				{
 					(*front)[pos1.y][pos1.x].alive = n == 2 || n == 3;
+					// if (n < 2 || n > 3) alive --;
 				}
 				else
 				{
 					(*front)[pos1.y][pos1.x].alive = n == 3;
+					// if (n == 3) alive ++;
 				}
-				if (front.get(pos1).alive != back.get(pos1).alive && front.get(pos1).notified == false)
+				// rl::drawRectangle(...pos * CELL_SIZE, CELL_SIZE, CELL_SIZE, front.get(pos1).alive ? rl::WHITE : rl::BLACK);
+				if (front.get(pos1).notified == false && front.get(pos1).alive != back.get(pos1).alive)
 				{
 					(*front)[pos1.y][pos1.x].notified = true;
 					emit_event(pos1);
@@ -136,11 +157,14 @@ fn int main(String[] args)
 				// if (off == {0, 0}) rl::drawRectangle(...pos1 * CELL_SIZE, CELL_SIZE, CELL_SIZE, front.get(pos1).alive ? rl::WHITE : rl::BLACK);
 			}
 		}
+		alloc.clear();
 /*		foreach (int y, &row : back) foreach (int x, cell : row)
 		{
 			char n = count_nbors(back, {x, y});
 			if ((*back)[y][x].alive)
 			{
+				// alive ++;
+				// rl::drawRectangle(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE, rl::WHITE);
 				(*front)[y][x].alive = n == 3 || n == 2;
 			}
 			else
@@ -152,7 +176,7 @@ fn int main(String[] args)
 		foreach (int y, &row : back) foreach (int x, cell : row)
 		{
 			alive += (usz)cell.alive;
-			rl::drawRectangle(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE, cell.alive ? rl::WHITE : rl::BLACK);
+			rl::drawRectangle(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE, cell.alive ? {255, 255, 255, 80} : {0, 0, 0, 80});
 		}
 		// for (int x = 0; x < GRID_SIZE.x; x++) for (int y = 0; y < GRID_SIZE.y; y++) rl::drawRectangle(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE, back.get({x,y}).alive ? rl::WHITE : rl::BLACK);
 		rl::drawFPS(20, 20);
@@ -183,7 +207,7 @@ fn char count_nbors(World* world, int[<2>] pos)
 	char c;
 	foreach (off : NBOR_OFFSETS)
 	{
-		if ((*world)[mod(pos.y + off.y, GRID_SIZE.y)][mod(pos.x + off.x, GRID_SIZE.x)]) c++;
+		if ((*world)[mod(pos.y + off.y, GRID_SIZE.y)][mod(pos.x + off.x, GRID_SIZE.x)].alive) c++;
 	}
 	return c;
 }

@@ -79,6 +79,7 @@ macro emit_event(int[<2>] pos) => next_queue.push(pos);
 
 fn int main(String[] args)
 {
+
 	char[] _mem = mem::new_array(char, 200 * mem::MB);
 	defer mem::free(_mem);
 	ArenaAllocator* alloc = allocator::wrap(_mem);
@@ -109,58 +110,71 @@ fn int main(String[] args)
 	(*back)[2][1].alive = true;
 	(*back)[2][2].alive = true;
 	// foreach (int y, &row : back) foreach (int x, cell : row) emit_event({x, y});
-	// foreach (int y, &row : back) foreach (int x, cell : row) if (cell.alive) alive ++;
+	usz alive;
+	foreach (int y, &row : back) foreach (int x, cell : row) if (cell.alive) alive ++;
 
 	rl::initWindow(...SCREEN_SIZE, "Game of life on CPU");
 	defer rl::closeWindow();
-	// rl::setTargetFPS(60);
-	rl::@drawing() {rl::clearBackground(rl::BLACK);};
-	//isz alive;
+	rl::setTargetFPS(60);
+
+	RenderTexture tex = rl::loadRenderTexture(...SCREEN_SIZE);
+	defer rl::unloadRenderTexture(tex);
+	// isz alive;
 	while (!rl::windowShouldClose()) rl::@drawing()
 	{
 		@swap(event_queue, next_queue);
 		@swap(alloc, alloc1);
 		alloc1.clear();
-
-		rl::clearBackground(rl::BLACK);
-		usz alive;
+		// rl::clearBackground(rl::BLACK);
+		// usz alive;// = event_queue.len();
 		// io::printfn("got %s events", event_queue.len());
-		while (try int[<2>] pos = event_queue.pop_front())
+		rl::@textureMode(tex)
 		{
-			// rl::drawRectangle(pos.x * CELL_SIZE, pos.y * CELL_SIZE, CELL_SIZE, CELL_SIZE, rl::RED);
-			// rl::drawRectangle(pos.x * CELL_SIZE, pos.y * CELL_SIZE, CELL_SIZE, CELL_SIZE, back.get(pos).alive ? rl::WHITE : rl::BLACK);
-			// rl::drawRectangle(...pos * CELL_SIZE, CELL_SIZE, CELL_SIZE, back.get(pos).alive ? rl::WHITE : rl::BLACK);
-			foreach (off : OFFSETS)
+			while (try int[<2>] pos = event_queue.pop_front())
 			{
-				int[<2>] pos1 = mod2(pos + off, GRID_SIZE);
-				char n = count_nbors(back, pos1);
-				// notified.add(pos1);
+				// rl::drawRectangle(...pos * CELL_SIZE, CELL_SIZE, CELL_SIZE, /*(*back)[pos.y][pos.x].alive ? rl::WHITE : rl::BLACK*/rl::GREEN);
+				// rl::drawRectangle(pos.x * CELL_SIZE, pos.y * CELL_SIZE, CELL_SIZE, CELL_SIZE, rl::RED);
+				// rl::drawRectangle(pos.x * CELL_SIZE, pos.y * CELL_SIZE, CELL_SIZE, CELL_SIZE, back.get(pos).alive ? rl::WHITE : rl::BLACK);
+				rl::drawRectangle(...pos * CELL_SIZE, CELL_SIZE, CELL_SIZE, back.get(pos).alive ? rl::WHITE : rl::BLACK);
+				foreach (off : OFFSETS)
+				{
+					int[<2>] pos1 = mod2(pos + off, GRID_SIZE);
+					char n = count_nbors(back, pos1);
+					// defer rl::drawRectangle(...pos1 * CELL_SIZE, CELL_SIZE, CELL_SIZE, (*front)[pos1.y][pos1.x].alive ? rl::WHITE : rl::BLACK);
+					// rl::drawRectangle(...pos1 * CELL_SIZE, CELL_SIZE, CELL_SIZE, {0, 255, 0, 80});
+					// notified.add(pos1);
 
-				(*back)[pos1.y][pos1.x].notified = false;
+					(*back)[pos1.y][pos1.x].notified = false;
 
-				if (back.get(pos1).alive)
-				{
-					(*front)[pos1.y][pos1.x].alive = n == 2 || n == 3;
-					// if (n < 2 || n > 3) alive --;
+					if (back.get(pos1).alive)
+					{
+						(*front)[pos1.y][pos1.x].alive = n == 2 || n == 3;
+						// if (n < 2 || n > 3) alive --;
+					}
+					else
+					{
+						(*front)[pos1.y][pos1.x].alive = n == 3;
+						// if (n == 3) alive ++;
+					}
+					// rl::drawRectangle(...pos * CELL_SIZE, CELL_SIZE, CELL_SIZE, front.get(pos1).alive ? rl::WHITE : rl::BLACK);
+					if (front.get(pos1).notified == false && front.get(pos1).alive != back.get(pos1).alive)
+					{
+						alive += front.get(pos1).alive ? 1 : -1;
+						(*front)[pos1.y][pos1.x].notified = true;
+						emit_event(pos1);
+					}
+					// if (off == {0, 0}) rl::drawRectangle(...pos1 * CELL_SIZE, CELL_SIZE, CELL_SIZE, front.get(pos1).alive ? rl::WHITE : rl::BLACK);
 				}
-				else
-				{
-					(*front)[pos1.y][pos1.x].alive = n == 3;
-					// if (n == 3) alive ++;
-				}
-				// rl::drawRectangle(...pos * CELL_SIZE, CELL_SIZE, CELL_SIZE, front.get(pos1).alive ? rl::WHITE : rl::BLACK);
-				if (front.get(pos1).notified == false && front.get(pos1).alive != back.get(pos1).alive)
-				{
-					(*front)[pos1.y][pos1.x].notified = true;
-					emit_event(pos1);
-				}
-				// if (off == {0, 0}) rl::drawRectangle(...pos1 * CELL_SIZE, CELL_SIZE, CELL_SIZE, front.get(pos1).alive ? rl::WHITE : rl::BLACK);
+				// rl::drawRectangle(...pos * CELL_SIZE, CELL_SIZE, CELL_SIZE, (*back)[pos.y][pos.x].alive ? rl::WHITE : rl::BLACK);
 			}
-		}
+		};
+		rl::clearBackground(rl::BLACK);
+		rl::drawTextureRec(tex.texture, {0, 0, SCREEN_SIZE.x, -SCREEN_SIZE.y}, {0, 0}, rl::WHITE);
 		alloc.clear();
 /*		foreach (int y, &row : back) foreach (int x, cell : row)
 		{
 			char n = count_nbors(back, {x, y});
+			rl::drawRectangle(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE, cell.alive ? rl::WHITE : rl::BLACK);
 			if ((*back)[y][x].alive)
 			{
 				// alive ++;
@@ -173,11 +187,12 @@ fn int main(String[] args)
 			}
 		}*/
 
-		foreach (int y, &row : back) foreach (int x, cell : row)
+/*		foreach (int y, &row : back) foreach (int x, cell : row)
 		{
 			alive += (usz)cell.alive;
-			rl::drawRectangle(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE, cell.alive ? {255, 255, 255, 80} : {0, 0, 0, 80});
-		}
+			const OPACITY = 80;
+			rl::drawRectangle(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE, cell.alive ? {255, 0, 0, OPACITY} : {0, 0, 0, OPACITY});
+		}*/
 		// for (int x = 0; x < GRID_SIZE.x; x++) for (int y = 0; y < GRID_SIZE.y; y++) rl::drawRectangle(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE, back.get({x,y}).alive ? rl::WHITE : rl::BLACK);
 		rl::drawFPS(20, 20);
 		@pool()

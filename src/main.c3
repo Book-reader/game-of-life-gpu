@@ -21,11 +21,6 @@ const int[<2>][*] OFFSETS = {
 };
 
 
-/*bitstruct Cell : char
-{
-	bool alive;
-	bool notified;
-}*/
 struct Cell
 {
 	bool alive;
@@ -33,10 +28,10 @@ struct Cell
 }
 
 typedef World = Cell[GRID_SIZE.x][GRID_SIZE.y];
-macro bool World.@get(#world, x, y) => #world[y][x];
-macro void World.@set(#world, x, y, bool val)
+macro void World.set_and_emit(&self, int[<2>] pos, Cell val)
 {
-	event_queue.push({{x, y}, val});
+	emit_event(pos);
+	self.set(pos, val);
 }
 
 macro Cell World.get(&self, int[<2>] pos) => (*self)[pos.y][pos.x];
@@ -48,7 +43,6 @@ World* back = &buffers[1];
 
 LinkedList {int[2]} event_queue;
 LinkedList {int[2]} next_queue;
-
 
 macro emit_event(int[<2>] pos) => next_queue.push(pos);
 
@@ -68,24 +62,14 @@ fn int main(String[] args)
 	defer event_queue.free();
 	defer next_queue.free();
 
-	foreach (uint y, &row : back) foreach (uint x, cell : row)
-	{
-		if (rnd() > 0.5)
-		{
-			(*back)[y][x].alive = true;
-			emit_event({x, y});
-		}
-	}
-	emit_event({1, 0});
-	emit_event({2, 1});
-	emit_event({0, 2});
-	emit_event({1, 2});
-	emit_event({2, 2});
-	(*back)[0][1].alive = true;
-	(*back)[1][2].alive = true;
-	(*back)[2][0].alive = true;
-	(*back)[2][1].alive = true;
-	(*back)[2][2].alive = true;
+	// the abomination (randomises all cells)
+	foreach (uint y, &row : back) foreach (uint x, cell : row) if (rnd() > 0.5) back.set_and_emit({x, y}, {true, false});
+	// create a glider in the top left to make sure it isn't completely broken
+	back.set_and_emit({1, 0}, {true, false});
+	back.set_and_emit({2, 1}, {true, false});
+	back.set_and_emit({0, 2}, {true, false});
+	back.set_and_emit({1, 2}, {true, false});
+	back.set_and_emit({2, 2}, {true, false});
 
 	// initial alive count
 	usz alive;
@@ -104,10 +88,14 @@ fn int main(String[] args)
 		@swap(alloc, alloc1);
 		alloc1.clear();
 
+		usz events;
 		rl::@textureMode(tex)
 		{
 			while (try int[<2>] pos = event_queue.pop_front())
 			{
+				// Comment events++ to get a tiny performance boost :)
+				events ++;
+
 				rl::drawRectangle(...pos * CELL_SIZE, CELL_SIZE, CELL_SIZE, back.get(pos).alive ? rl::WHITE : rl::BLACK);
 				foreach (off : OFFSETS)
 				{
@@ -136,13 +124,21 @@ fn int main(String[] args)
 		alloc.clear();
 
 		rl::clearBackground(rl::BLACK);
-		// I have to draw to this texture to prevent flickering issues, and I use -SCREEN_SIZE.y because rendering to textures is flipped vertically for some reason
+		// I have to draw to this texture above to prevent flickering issues caused by raylibs double-buffering, and I use -SCREEN_SIZE.y because rendering to textures is flipped vertically for some reason
 		rl::drawTextureRec(tex.texture, {0, 0, SCREEN_SIZE.x, -SCREEN_SIZE.y}, {0, 0}, rl::WHITE);
 
 		rl::drawFPS(20, 20);
 		@pool()
 		{
-			rl::drawText(string::tformat_zstr("%s alive cells", alive), 20, 50, 20, rl::LIGHTGRAY);
+			const FONT_SIZE = 20;
+			ZString alive_str = string::tformat_zstr("%s alive cells", alive);
+			ZString events_str = string::tformat_zstr("%s events", events);
+
+			rl::drawRectangle(18, 48, rl::measureText(alive_str, FONT_SIZE) + 4, FONT_SIZE + 4, rl::WHITE);
+			rl::drawText(alive_str, 20, 50, FONT_SIZE, rl::BLACK);
+
+			rl::drawRectangle(18, 78, rl::measureText(events_str, FONT_SIZE) + 4, FONT_SIZE + 4, rl::WHITE);
+			rl::drawText(events_str, 20, 80, FONT_SIZE, rl::BLACK);
 		};
 		@swap(front, back);
 	};

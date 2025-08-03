@@ -31,11 +31,8 @@ typedef World = Cell[GRID_SIZE.x][GRID_SIZE.y];
 macro void World.set_and_emit(&self, int[<2>] pos, Cell val)
 {
 	emit_event(pos);
-	self.set(pos, val);
+	(*self)[pos.y][pos.x] = val;
 }
-
-macro Cell World.get(&self, int[<2>] pos) => (*self)[pos.y][pos.x];
-macro void World.set(&self, int[<2>] pos, Cell val) => (*self)[pos.y][pos.x] = val;
 
 World[2] buffers;
 World* front = &buffers[0];
@@ -96,7 +93,7 @@ fn int main(String[] args)
 				// Comment events++ to get a tiny performance boost :)
 				events ++;
 
-				rl::drawRectangle(...pos * CELL_SIZE, CELL_SIZE, CELL_SIZE, back.get(pos).alive ? rl::WHITE : rl::BLACK);
+				rl::drawRectangle(...pos * CELL_SIZE, CELL_SIZE, CELL_SIZE, (*back)[pos.y][pos.x].alive ? rl::WHITE : rl::BLACK);
 				foreach (off : OFFSETS)
 				{
 					int[<2>] pos1 = mod2(pos + off, GRID_SIZE);
@@ -104,7 +101,7 @@ fn int main(String[] args)
 
 					(*back)[pos1.y][pos1.x].notified = false;
 
-					if (back.get(pos1).alive)
+					if ((*back)[pos1.y][pos1.x].alive)
 					{
 						(*front)[pos1.y][pos1.x].alive = n == 2 || n == 3;
 					}
@@ -112,9 +109,9 @@ fn int main(String[] args)
 					{
 						(*front)[pos1.y][pos1.x].alive = n == 3;
 					}
-					if (front.get(pos1).notified == false && front.get(pos1).alive != back.get(pos1).alive)
+					if ((*front)[pos1.y][pos1.x].notified == false && (*front)[pos1.y][pos1.x].alive != (*back)[pos1.y][pos1.x].alive)
 					{
-						alive += front.get(pos1).alive ? 1 : -1;
+						alive += (*front)[pos1.y][pos1.x].alive ? 1 : -1;
 						(*front)[pos1.y][pos1.x].notified = true;
 						emit_event(pos1);
 					}
